@@ -15,12 +15,9 @@ const (
 	oneDividedBySqrtOfTwo  = 0.70710678118
 )
 
-// type Tree struct {
-// 	root *treeNode
-// }
-
 /////////////////////////////////////////////////////////////
 // TreeNode structure, New function, and methods
+/////////////////////////////////////////////////////////////
 
 type TreeNode struct {
 	State               GameState
@@ -127,12 +124,12 @@ type GameState interface {
 /////////////////////////////////////////////////////////////
 
 type GameState123ToTen struct {
-	Total uint8
+	Total       uint8
 	PlayerBMove bool
 }
 
 func (gstate GameState123ToTen) PossibleMoves() []string {
-	moves := []string{"1","2","3"}
+	moves := []string{"1", "2", "3"}
 	return moves
 }
 
@@ -149,4 +146,8 @@ func (gstate GameState123ToTen) TerminalReward() float64 {
 		reward = 1.0
 	}
 	return reward
+}
+
+func (gstate GameState123ToTen) NewGameStateFromMove(move string) GameState {
+
 }
