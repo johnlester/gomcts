@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	// "os"
+	"strconv"
 )
 
 var ()
@@ -124,7 +125,7 @@ type GameState interface {
 /////////////////////////////////////////////////////////////
 
 type GameState123ToTen struct {
-	Total       uint8
+	Total       int
 	PlayerBMove bool
 }
 
@@ -148,6 +149,36 @@ func (gstate GameState123ToTen) TerminalReward() float64 {
 	return reward
 }
 
-func (gstate GameState123ToTen) NewGameStateFromMove(move string) GameState {
-
+func (gstate GameState123ToTen) NewGameStateFromMove(move string) GameState123ToTen {
+	cpy := gstate.Copy()
+	cpy.DoMove(move)
+	return cpy
 }
+
+func (gstate *GameState123ToTen) DoMove(move string) {
+	moveFromString, _ := strconv.Atoi(move)
+	gstate.Total += moveFromString
+	gstate.PlayerBMove = !gstate.PlayerBMove
+}
+
+
+func (gstate GameState123ToTen) RewardFromRandomPlayout() float64 {
+	cpy := gstate.Copy()
+	for cpy.IsNotTerminal() {
+		cpy.DoMove(cpy.RandomMove())
+	}
+	return cpy.TerminalReward()
+}
+
+func (gstate GameState123ToTen) RandomMove() string {
+	rndIdx := rand.Intn(len(gstate.PossibleMoves()))
+	return gstate.PossibleMoves()[rndIdx]
+}
+
+
+func (gstate GameState123ToTen) Copy() GameState123ToTen {
+	newCopy := gstate
+	return newCopy
+}
+
+
