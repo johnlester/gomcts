@@ -74,8 +74,8 @@ func TestGame123ToTenGoMCTS_RootNode(t *testing.T) {
 	if rn.NextMoveToTry != 0 {
 		t.Errorf("Root node at creation should have NextMoveToTry of 0")
 	}
-	if len(rn.Children) != 0 {
-		t.Errorf("Root node at creation should have 0 Children")
+	if len(rn.Children) != 3 {
+		t.Errorf("Root node at creation should have 3 Children")
 	}}
 
 func TestGame123ToTenGoMCTS_OneManualIteration(t *testing.T) {
@@ -106,7 +106,7 @@ func TestGame123ToTenGoMCTS_OneManualIteration(t *testing.T) {
 	}
 	// Now do random playout
 	reward := child.State.RewardFromRandomPlayout()
-	if (reward != 1.0) && (reward != 0.0) {
+	if reward[0] + reward[1] != 1.0 {
 		t.Errorf("Something is wrong")
 	}
 	// Now propagate reward from child to parent (root node in this case)
@@ -132,29 +132,29 @@ func TestGame123ToTenGoMCTS_DoOneIteration(t *testing.T) {
 	if rn.NextMoveToTry != 1 {
 		t.Errorf("Root node at 1 iteration should have NextMoveToTry of 1")
 	}
-	if len(rn.Children) != 1 {
-		t.Errorf("Root node at 1 iteration should have 1 child")
-	}
+	// if len(rn.Children) != 1 {
+	// 	t.Errorf("Root node at 1 iteration should have 1 child")
+	// }
 	if rn.Children[0].State.IsSecondPlayersTurn() != true {
 		t.Errorf("State at child node after 1 iteration should have be second players turn")
 	}
 }
 
 func TestGame123ToTenGoMCTS_DoManyIterationsEndgame(t *testing.T) {
-	iters := 500
+	iters := 10000
 	gs := NewGameState123ToTen(int64(time.Now().Nanosecond()))
-	gs.Total = 8
+	gs.Total = 0
 	rn := NewNode(gs, nil, "")
 	rn.DoNIterations(iters)
+	if rn.State.IsSecondPlayersTurn() != false {
+		t.Errorf("Something is wrong")
+	}
 	if rn.VisitCount != float64(iters) {
 		t.Errorf("Root node at %v iterations should have VisitCount of %v", iters, iters)
 	}
-	if rn.NextMoveToTry != 3 {
-		t.Errorf("Root node at %v iterations should have NextMoveToTry of 3", iters)
+	if rn.NextMoveToTry != rn.NumberOfChildren {
+		t.Errorf("Root node at %v iterations should have NextMoveToTry of %v, not %v", iters, rn.NumberOfChildren, rn.NextMoveToTry)
 	}
-	move := rn.BestChild().GeneratingMove
-	t.Logf("Root node's best move is %v", move)
-	t.Logf("%v", rn.Summary())
 }
 
 

@@ -12,7 +12,7 @@ var (
 
 const (
 	ExplorationFactor = 1.0
-	dummyLowUCTValue = -2.0 // Assumes all scores are positive
+	dummyLowUCTValue = -10000.0 // Assumes all scores are positive
 )
 
 
@@ -29,7 +29,7 @@ type TreeNode struct {
 	Children            []*TreeNode
 	NextMoveToTry       int
 	VisitCount          float64
-	CumulativeScore     float64 //Scores are to be between 0 (loss) and 1 (win)
+	CumulativeScore     [2]float64 //Scores are to be between 0 (loss) and 1 (win)
 }
 
 func NewNode(state GameState, parent *TreeNode, generatingMove string) *TreeNode {
@@ -45,6 +45,16 @@ func NewNode(state GameState, parent *TreeNode, generatingMove string) *TreeNode
 	//rest of fields should start with "zeroed" values
 }
 
+func (node *TreeNode) averageScore() float64 {
+	var result float64
+	if node.State.IsSecondPlayersTurn() {
+		result = node.CumulativeScore[0] / node.VisitCount		//Because parent is not second player's turn
+	} else {
+		result = node.CumulativeScore[1] / node.VisitCount
+	}
+	return result
+}
+
 func (node *TreeNode) BestMoveFromNIterations(iterationBudget int) string {
 	node.DoNIterations(iterationBudget)
 	return node.BestChild().GeneratingMove
@@ -56,6 +66,8 @@ func (node *TreeNode) DoNIterations(iterationBudget int) {
 		reward := currentNode.State.RewardFromRandomPlayout()
 		currentNode.backpropagateReward(reward)
 	}
+	log.Printf("Node's best move is %v", node.BestChild().GeneratingMove)
+	log.Printf("%v", node.Summary())
 }
 
 
@@ -72,13 +84,12 @@ func (node *TreeNode) doTreePolicy() *TreeNode {
 }
 
 //Two-player version using negamax 
-func (node *TreeNode) backpropagateReward(reward float64) {
+func (node *TreeNode) backpropagateReward(scores [2]float64) {
 	currentNode := node
-	currentReward := reward
 	for currentNode.Parent != nil {
 		currentNode.VisitCount += 1.0
-		currentNode.CumulativeScore += currentReward
-		currentReward = 1.0 - currentReward
+		currentNode.CumulativeScore[0] += scores[0]
+		currentNode.CumulativeScore[1] += scores[1]
 		currentNode = currentNode.Parent
 	}
 	//Increment root node counter
@@ -86,15 +97,15 @@ func (node *TreeNode) backpropagateReward(reward float64) {
 }
 
 func (node *TreeNode) BestChild() *TreeNode {
-	var bestUctValue float64 = dummyLowUCTValue		
+	var bestAveScore float64 = dummyLowUCTValue		
 	var selectedChild *TreeNode
 	for i := 0; i < node.NextMoveToTry; i++ {
 		child := node.Children[i]
-		uctValue := (child.CumulativeScore / child.VisitCount)
+		aveScore := child.averageScore()
 		//Need random tie-breaker?
-		if uctValue >= bestUctValue {
+		if aveScore >= bestAveScore {
 			selectedChild = child
-			bestUctValue = uctValue
+			bestAveScore = aveScore
 		}
 	}
 	return selectedChild
@@ -104,7 +115,7 @@ func (node *TreeNode) ChildToExplore() *TreeNode {
 	var bestUctValue float64 = dummyLowUCTValue
 	var selectedChild *TreeNode
 	for _, child := range node.Children {
-		uctValue := (child.CumulativeScore / child.VisitCount) + ExplorationFactor * math.Sqrt(2.0 * math.Log(node.VisitCount) / child.VisitCount)
+		uctValue := child.averageScore() + ExplorationFactor * math.Sqrt(2.0 * math.Log(node.VisitCount) / child.VisitCount)
 		//Need random tie-breaker?
 		if uctValue >= bestUctValue {
 			selectedChild = child
@@ -135,7 +146,7 @@ func (node *TreeNode) Summary() string {
 	summary += fmt.Sprintf("Root has  %v descendants (counting itself)\n", len(descendants(node)))
 	for i := 0; i < node.NextMoveToTry; i++ {
 		child := node.Children[i]
-		summary += fmt.Sprintf(" %v) Move %v: %v visits, %v cum. score, %v average score, %v descendants\n", i, child.GeneratingMove, child.VisitCount, child.CumulativeScore, (child.CumulativeScore / child.VisitCount), len(descendants(child)))
+		summary += fmt.Sprintf(" %v) Move %v: %v visits, %v cum. score, %v average score, %v descendants\n", i, child.GeneratingMove, child.VisitCount, child.CumulativeScore, child.averageScore(), len(descendants(child)))
 	}
 	return summary
 }
@@ -158,9 +169,9 @@ type GameState interface {
 	PossibleMoves() []string
 	PossibleMovesShuffled() []string
 	IsTerminal() bool
-	TerminalReward() float64
+	TerminalReward() [2]float64
 	NewGameStateFromMove(move string) GameState
-	RewardFromRandomPlayout() float64
+	RewardFromRandomPlayout() [2]float64
 	IsSecondPlayersTurn() bool
 	LocalRand() *rand.Rand
 	DoMove(string)

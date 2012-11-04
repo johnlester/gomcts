@@ -69,15 +69,18 @@ func (gstate *GameState123ToTen) LocalRand() *rand.Rand {
 	return gstate.localRand
 }
 
-func (gstate *GameState123ToTen) TerminalReward() float64 {
+func (gstate *GameState123ToTen) TerminalReward() [2]float64 {
 	if !gstate.IsTerminal() {
 		panic("reward called but gstate not terminal")
 	}
-	var reward float64
+	var reward [2]float64
 	if gstate.SecondPlayersTurn {
-		reward = 0.0
+		// Finished game state is second player's turn, which means first player just did winning move
+		reward[0] = 1.0
+		reward[1] = 0.0
 	} else {
-		reward = 1.0
+		reward[0] = 0.0
+		reward[1] = 1.0
 	}
 	return reward
 }
@@ -88,7 +91,7 @@ func (gstate GameState123ToTen) NewGameStateFromMove(move string) GameState {
 	return &cpy
 }
 
-func (gstate *GameState123ToTen) RewardFromRandomPlayout() float64 {
+func (gstate *GameState123ToTen) RewardFromRandomPlayout() [2]float64 {
 	cpy := gstate.Copy()
 	DoRandomPlayout(&cpy)
 	return cpy.TerminalReward()
@@ -99,9 +102,8 @@ func (gstate *GameState123ToTen) DoMove(move string) {
 	gstate.Total += moveFromString
 	if gstate.Total >= 10 {
 		gstate.terminal = true
-	} else {
-		gstate.SecondPlayersTurn = !(gstate.SecondPlayersTurn)
-	}
+	} 
+	gstate.SecondPlayersTurn = !(gstate.SecondPlayersTurn)
 }
 
 func (gstate GameState123ToTen) Copy() GameState123ToTen {
