@@ -2,6 +2,7 @@ package gomcts
 
 import (
 	"testing"
+	"time"
 )
 
 /////////////////////////////////////////////////////////////
@@ -9,7 +10,10 @@ import (
 /////////////////////////////////////////////////////////////
 
 func TestGame123ToTen_Moves(t *testing.T) {
-	gs := NewGameState123ToTen()
+	gs := NewGameState123ToTen(42)
+	if gs.NumberOfMoves() != 3 {
+		t.Errorf("123ToTen GameState should have 3 possible moves, but instead has %v", gs.NumberOfMoves())
+	}
 	moves := gs.PossibleMoves()
 	if len(moves) != 3 {
 		t.Errorf("123ToTen GameState should have 3 possible moves, but instead has %v", len(moves))
@@ -17,7 +21,7 @@ func TestGame123ToTen_Moves(t *testing.T) {
 }
 
 func TestGame123ToTen_Copying(t *testing.T) {
-	gs := NewGameState123ToTen()
+	gs := NewGameState123ToTen(42)
 	cpy := gs.Copy()
 	cpy.Total++
 	if cpy.Total != 1 {
@@ -29,7 +33,7 @@ func TestGame123ToTen_Copying(t *testing.T) {
 }
 
 func TestGame123ToTen_DoMove(t *testing.T) {
-	gs := NewGameState123ToTen()
+	gs := NewGameState123ToTen(42)
 	gs.DoMove("1")
 	if gs.Total != 1 {
 		t.Errorf("Total should be 1 but is %v", gs.Total)
@@ -40,12 +44,18 @@ func TestGame123ToTen_DoMove(t *testing.T) {
 }
 
 func TestGame123ToTen_RandomPlayout(t *testing.T) {
-	gs := NewGameState123ToTen()
+	gs := NewGameState123ToTen(4)
+	if gs.Total != 0 {
+		t.Errorf("Starting total should be 0 but is %v", gs.Total)
+	}
+	if gs.NumberOfMoves() != 3 {
+		t.Errorf("123ToTen GameState should have 3 possible moves, but instead has %v", gs.NumberOfMoves())
+	}
 	DoRandomPlayout(gs)
 	if gs.Total < 10 {
-		t.Errorf("Total should be >=10 but is %v", gs.Total)
+		t.Errorf("Total should be 10 but is %v", gs.Total)
 	}
-	if gs.IsNotTerminal() {
+	if !(gs.IsTerminal()) {
 		t.Errorf("Should be terminal")
 	}
 }
@@ -56,7 +66,7 @@ func TestGame123ToTen_RandomPlayout(t *testing.T) {
 /////////////////////////////////////////////////////////////
 
 func TestGame123ToTenGoMCTS_RootNode(t *testing.T) {
-	gs := NewGameState123ToTen()
+	gs := NewGameState123ToTen(42)
 	rn := NewNode(gs, nil, "")
 	if rn.VisitCount != 0.0 {
 		t.Errorf("Root node at creation should have VisitCount of 0.0")
@@ -64,10 +74,12 @@ func TestGame123ToTenGoMCTS_RootNode(t *testing.T) {
 	if rn.NextMoveToTry != 0 {
 		t.Errorf("Root node at creation should have NextMoveToTry of 0")
 	}
-}
+	if len(rn.Children) != 0 {
+		t.Errorf("Root node at creation should have 0 Children")
+	}}
 
 func TestGame123ToTenGoMCTS_OneManualIteration(t *testing.T) {
-	gs := NewGameState123ToTen()
+	gs := NewGameState123ToTen(42)
 	rn := NewNode(gs, nil, "")
 	child := rn.NewChild()
 	move := child.GeneratingMove
@@ -86,7 +98,7 @@ func TestGame123ToTenGoMCTS_OneManualIteration(t *testing.T) {
 	if rn.Parent != nil {
 		t.Errorf("Something is wrong")
 	}
-	if !child.State.IsNotTerminal() {
+	if child.State.IsTerminal() {
 		t.Errorf("Something is wrong")
 	}
 	if child.State.IsSecondPlayersTurn() != true {
@@ -111,7 +123,7 @@ func TestGame123ToTenGoMCTS_OneManualIteration(t *testing.T) {
 }
 
 func TestGame123ToTenGoMCTS_DoOneIteration(t *testing.T) {
-	gs := NewGameState123ToTen()
+	gs := NewGameState123ToTen(42)
 	rn := NewNode(gs, nil, "")
 	rn.DoNIterations(1)
 	if rn.VisitCount != 1.0 {
@@ -120,11 +132,18 @@ func TestGame123ToTenGoMCTS_DoOneIteration(t *testing.T) {
 	if rn.NextMoveToTry != 1 {
 		t.Errorf("Root node at 1 iteration should have NextMoveToTry of 1")
 	}
+	if len(rn.Children) != 1 {
+		t.Errorf("Root node at 1 iteration should have 1 child")
+	}
+	if rn.Children[0].State.IsSecondPlayersTurn() != true {
+		t.Errorf("State at child node after 1 iteration should have be second players turn")
+	}
 }
 
-func TestGame123ToTenGoMCTS_DoManyIterations(t *testing.T) {
-	iters := 100000
-	gs := NewGameState123ToTen()
+func TestGame123ToTenGoMCTS_DoManyIterationsEndgame(t *testing.T) {
+	iters := 500
+	gs := NewGameState123ToTen(int64(time.Now().Nanosecond()))
+	gs.Total = 8
 	rn := NewNode(gs, nil, "")
 	rn.DoNIterations(iters)
 	if rn.VisitCount != float64(iters) {
@@ -137,3 +156,20 @@ func TestGame123ToTenGoMCTS_DoManyIterations(t *testing.T) {
 	t.Logf("Root node's best move is %v", move)
 	t.Logf("%v", rn.Summary())
 }
+
+
+// func TestGame123ToTenGoMCTS_DoManyIterations(t *testing.T) {
+// 	iters := 10000
+// 	gs := NewGameState123ToTen(int64(time.Now().Nanosecond()))
+// 	rn := NewNode(gs, nil, "")
+// 	rn.DoNIterations(iters)
+// 	if rn.VisitCount != float64(iters) {
+// 		t.Errorf("Root node at %v iterations should have VisitCount of %v", iters, iters)
+// 	}
+// 	if rn.NextMoveToTry != 3 {
+// 		t.Errorf("Root node at %v iterations should have NextMoveToTry of 3", iters)
+// 	}
+// 	move := rn.BestChild().GeneratingMove
+// 	t.Logf("Root node's best move is %v", move)
+// 	t.Logf("%v", rn.Summary())
+// }

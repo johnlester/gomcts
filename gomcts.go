@@ -3,6 +3,8 @@ package gomcts
 import (
 	"math"
 	"fmt"
+	"math/rand"
+	"log"
 )
 
 var (
@@ -59,7 +61,7 @@ func (node *TreeNode) DoNIterations(iterationBudget int) {
 
 func (node *TreeNode) doTreePolicy() *TreeNode {
 	selectedNode := node
-	for selectedNode.State.IsNotTerminal() {
+	for !(selectedNode.State.IsTerminal()) {
 		if selectedNode.IsFullyExpanded() {
 			selectedNode = selectedNode.ChildToExplore()
 		} else {
@@ -75,7 +77,7 @@ func (node *TreeNode) backpropagateReward(reward float64) {
 	currentReward := reward
 	for currentNode.Parent != nil {
 		currentNode.VisitCount += 1.0
-		currentNode.CumulativeScore += reward
+		currentNode.CumulativeScore += currentReward
 		currentReward = 1.0 - currentReward
 		currentNode = currentNode.Parent
 	}
@@ -130,26 +132,65 @@ func (node *TreeNode) Summary() string {
 	var summary string
 	summary = fmt.Sprintf("Number of iterations done: %v\n", node.VisitCount)
 	summary += fmt.Sprintf("Root has explored %v of %v children\n", node.NextMoveToTry, node.NumberOfChildren)
+	summary += fmt.Sprintf("Root has  %v descendants (counting itself)\n", len(descendants(node)))
 	for i := 0; i < node.NextMoveToTry; i++ {
 		child := node.Children[i]
-		summary += fmt.Sprintf("  %v) %v: %v visits, %v average score\n", i, child.GeneratingMove, child.VisitCount, (child.CumulativeScore / child.VisitCount))
+		summary += fmt.Sprintf(" %v) Move %v: %v visits, %v cum. score, %v average score, %v descendants\n", i, child.GeneratingMove, child.VisitCount, child.CumulativeScore, (child.CumulativeScore / child.VisitCount), len(descendants(child)))
 	}
 	return summary
 }
+
+func descendants(node *TreeNode) []*TreeNode {
+	result := []*TreeNode{node}
+	for i := 0; i< node.NextMoveToTry; i++ {
+		result = append(result, descendants(node.Children[i])...)
+	}
+	return result
+}
+
 
 /////////////////////////////////////////////////////////////
 // GameState interface
 /////////////////////////////////////////////////////////////
 
 type GameState interface {
-	// PossibleMoves() []string
+	NumberOfMoves() int
+	PossibleMoves() []string
 	PossibleMovesShuffled() []string
-	IsNotTerminal() bool
+	IsTerminal() bool
 	TerminalReward() float64
 	NewGameStateFromMove(move string) GameState
 	RewardFromRandomPlayout() float64
 	IsSecondPlayersTurn() bool
+	LocalRand() *rand.Rand
+	DoMove(string)
+	Summary() string
+	CurrentPlayer() string
+}
+
+/////////////////////////////////////////////////////////////
+// Playout Worker
+/////////////////////////////////////////////////////////////
+
+type PlayoutWorker struct {
+	
 }
 
 
-
+func DoRandomPlayout(gstate GameState) {	
+	log.Printf("Playout\n%v", gstate.Summary())
+	for !(gstate.IsTerminal()) {
+		var i int
+		if gstate.NumberOfMoves() == 0 {
+			panic("random playout called on game state with zero possible moves")
+		}
+		if gstate.NumberOfMoves() == 1 {
+			i = 0
+		} else {
+			i = gstate.LocalRand().Intn(gstate.NumberOfMoves())
+		}
+		log.Printf("selected move %v of %v", gstate.PossibleMoves()[i], gstate.NumberOfMoves())
+		gstate.DoMove(gstate.PossibleMoves()[i])
+		log.Printf(gstate.Summary())		
+	}
+}
