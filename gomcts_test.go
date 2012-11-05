@@ -157,19 +157,23 @@ func TestGame123ToTenGoMCTS_DoManyIterationsEndgame(t *testing.T) {
 	}
 }
 
+/////////////////////////////////////////////////////////////
+// AddTillX Game tests
+/////////////////////////////////////////////////////////////
 
-// func TestGame123ToTenGoMCTS_DoManyIterations(t *testing.T) {
-// 	iters := 10000
-// 	gs := NewGameState123ToTen(int64(time.Now().Nanosecond()))
-// 	rn := NewNode(gs, nil, "")
-// 	rn.DoNIterations(iters)
-// 	if rn.VisitCount != float64(iters) {
-// 		t.Errorf("Root node at %v iterations should have VisitCount of %v", iters, iters)
-// 	}
-// 	if rn.NextMoveToTry != 3 {
-// 		t.Errorf("Root node at %v iterations should have NextMoveToTry of 3", iters)
-// 	}
-// 	move := rn.BestChild().GeneratingMove
-// 	t.Logf("Root node's best move is %v", move)
-// 	t.Logf("%v", rn.Summary())
-// }
+func TestGameAddTillXMCTS_DoManyIterationsEndgame(t *testing.T) {
+	iters := 1000000
+	gs := NewGameStateAddTillX(int64(time.Now().Nanosecond()))
+	gs.Total = 0
+	rn := NewNode(gs, nil, "")
+	rn.DoNIterations(iters)
+	if rn.State.IsSecondPlayersTurn() != false {
+		t.Errorf("Something is wrong")
+	}
+	if rn.VisitCount != float64(iters) {
+		t.Errorf("Root node at %v iterations should have VisitCount of %v", iters, iters)
+	}
+	if rn.NextMoveToTry != rn.NumberOfChildren {
+		t.Errorf("Root node at %v iterations should have NextMoveToTry of %v, not %v", iters, rn.NumberOfChildren, rn.NextMoveToTry)
+	}
+}

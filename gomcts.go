@@ -188,8 +188,8 @@ type PlayoutWorker struct {
 }
 
 
-func DoRandomPlayout(gstate GameState) {	
-	log.Printf("Playout\n%v", gstate.Summary())
+func DoRandomPlayout(gstate GameState) {
+	// log.Printf("Playout\n%v", gstate.Summary())
 	for !(gstate.IsTerminal()) {
 		var i int
 		if gstate.NumberOfMoves() == 0 {
@@ -200,8 +200,8 @@ func DoRandomPlayout(gstate GameState) {
 		} else {
 			i = gstate.LocalRand().Intn(gstate.NumberOfMoves())
 		}
-		log.Printf("selected move %v of %v", gstate.PossibleMoves()[i], gstate.NumberOfMoves())
+		// log.Printf("selected move %v of %v", gstate.PossibleMoves()[i], gstate.NumberOfMoves())
 		gstate.DoMove(gstate.PossibleMoves()[i])
-		log.Printf(gstate.Summary())		
+		// log.Printf(gstate.Summary())		
 	}
 }
