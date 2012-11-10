@@ -205,3 +205,5 @@ func DoRandomPlayout(gstate GameState) {
 		// log.Printf(gstate.Summary())		
 	}
 }
+
+

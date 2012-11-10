@@ -162,7 +162,7 @@ func TestGame123ToTenGoMCTS_DoManyIterationsEndgame(t *testing.T) {
 /////////////////////////////////////////////////////////////
 
 func TestGameAddTillXMCTS_DoManyIterationsEndgame(t *testing.T) {
-	iters := 2000000
+	iters := 10000
 	gs := NewGameStateAddTillX(int64(time.Now().Nanosecond()))
 	gs.Total = 0
 	rn := NewNode(gs, nil, "")
