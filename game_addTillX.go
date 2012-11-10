@@ -11,7 +11,7 @@ import (
 /////////////////////////////////////////////////////////////
 
 const (
-	TargetTotal = 21
+	TargetTotal = 31
 	MinMove = 1
 	MaxMove = 4
 )
