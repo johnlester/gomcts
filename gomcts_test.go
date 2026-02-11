@@ -1,179 +1,268 @@
 package gomcts
 
 import (
+	"math/rand/v2"
 	"testing"
-	"time"
 )
 
-/////////////////////////////////////////////////////////////
-// 123ToTen Game tests
-/////////////////////////////////////////////////////////////
+// --- Game123ToTen unit tests ---
 
-func TestGame123ToTen_Moves(t *testing.T) {
-	gs := NewGameState123ToTen(42)
-	if gs.NumberOfMoves() != 3 {
-		t.Errorf("123ToTen GameState should have 3 possible moves, but instead has %v", gs.NumberOfMoves())
-	}
-	moves := gs.PossibleMoves()
-	if len(moves) != 3 {
-		t.Errorf("123ToTen GameState should have 3 possible moves, but instead has %v", len(moves))
+func TestGame123ToTen_Actions(t *testing.T) {
+	g := NewGame123ToTen()
+	if got := len(g.Actions()); got != 3 {
+		t.Errorf("expected 3 actions at start, got %d", got)
 	}
 }
 
-func TestGame123ToTen_Copying(t *testing.T) {
-	gs := NewGameState123ToTen(42)
-	cpy := gs.Copy()
-	cpy.Total++
-	if cpy.Total != 1 {
-		t.Errorf("cpy.Total should be 1 but is %v", cpy.Total)
+func TestGame123ToTen_ActionsNearEnd(t *testing.T) {
+	tests := []struct {
+		total    int
+		expected int
+	}{
+		{0, 3}, {5, 3}, {7, 3},
+		{8, 2}, {9, 1}, {10, 0},
 	}
-	if gs.Total != 0 {
-		t.Errorf("gs.Total should still be 0 but is %v", gs.Total)
-	}
-}
-
-func TestGame123ToTen_DoMove(t *testing.T) {
-	gs := NewGameState123ToTen(42)
-	gs.DoMove("1")
-	if gs.Total != 1 {
-		t.Errorf("Total should be 1 but is %v", gs.Total)
-	}
-	if gs.SecondPlayersTurn != true {
-		t.Errorf("Should be Player B's move now")
+	for _, tt := range tests {
+		g := &Game123ToTen{total: tt.total}
+		if got := len(g.Actions()); got != tt.expected {
+			t.Errorf("total %d: expected %d actions, got %d", tt.total, tt.expected, got)
+		}
 	}
 }
 
-func TestGame123ToTen_RandomPlayout(t *testing.T) {
-	gs := NewGameState123ToTen(4)
-	if gs.Total != 0 {
-		t.Errorf("Starting total should be 0 but is %v", gs.Total)
+func TestGame123ToTen_NextState(t *testing.T) {
+	g := NewGame123ToTen()
+	next := g.NextState("2").(*Game123ToTen)
+	if next.Total() != 2 {
+		t.Errorf("expected total 2, got %d", next.Total())
 	}
-	if gs.NumberOfMoves() != 3 {
-		t.Errorf("123ToTen GameState should have 3 possible moves, but instead has %v", gs.NumberOfMoves())
+	if next.Player() != 1 {
+		t.Errorf("expected player 1, got %d", next.Player())
 	}
-	DoRandomPlayout(gs)
-	if gs.Total < 10 {
-		t.Errorf("Total should be 10 but is %v", gs.Total)
+	// Original must be unchanged.
+	if g.Total() != 0 {
+		t.Errorf("original state mutated: total %d", g.Total())
 	}
-	if !(gs.IsTerminal()) {
-		t.Errorf("Should be terminal")
-	}
-}
-
-
-/////////////////////////////////////////////////////////////
-// 123ToTen MCTS Tests
-/////////////////////////////////////////////////////////////
-
-func TestGame123ToTenGoMCTS_RootNode(t *testing.T) {
-	gs := NewGameState123ToTen(42)
-	rn := NewNode(gs, nil, "")
-	if rn.VisitCount != 0.0 {
-		t.Errorf("Root node at creation should have VisitCount of 0.0")
-	}
-	if rn.NextMoveToTry != 0 {
-		t.Errorf("Root node at creation should have NextMoveToTry of 0")
-	}
-	if len(rn.Children) != 3 {
-		t.Errorf("Root node at creation should have 3 Children")
-	}}
-
-func TestGame123ToTenGoMCTS_OneManualIteration(t *testing.T) {
-	gs := NewGameState123ToTen(42)
-	rn := NewNode(gs, nil, "")
-	child := rn.NewChild()
-	move := child.GeneratingMove
-	if rn.NextMoveToTry != 1 {
-		t.Errorf("Root node at 1 iteration should have NextMoveToTry of 1")
-	}
-	if (move != "1") && (move != "2") && (move != "3") {
-		t.Errorf("Move is something wrong")
-	}
-	if rn.Children[0] != child {
-		t.Errorf("Something is wrong")
-	}
-	if child.Parent != rn {
-		t.Errorf("Something is wrong")
-	}
-	if rn.Parent != nil {
-		t.Errorf("Something is wrong")
-	}
-	if child.State.IsTerminal() {
-		t.Errorf("Something is wrong")
-	}
-	if child.State.IsSecondPlayersTurn() != true {
-		t.Errorf("Something is wrong")
-	}
-	// Now do random playout
-	reward := child.State.RewardFromRandomPlayout()
-	if reward[0] + reward[1] != 1.0 {
-		t.Errorf("Something is wrong")
-	}
-	// Now propagate reward from child to parent (root node in this case)
-	child.backpropagateReward(reward)
-	if rn.VisitCount != 1.0 {
-		t.Errorf("Root node should have VisitCount of 1.0, not %v", rn.VisitCount)
-	}
-	if child.CumulativeScore != reward {
-		t.Errorf("Child node should have CumulativeScore of %v, not %v", reward, child.CumulativeScore)
-	}
-	if child.VisitCount != 1.0 {
-		t.Errorf("Child node should have VisitCount of 1.0, not %v", child.VisitCount)
+	if g.Player() != 0 {
+		t.Errorf("original state mutated: player %d", g.Player())
 	}
 }
 
-func TestGame123ToTenGoMCTS_DoOneIteration(t *testing.T) {
-	gs := NewGameState123ToTen(42)
-	rn := NewNode(gs, nil, "")
-	rn.DoNIterations(1)
-	if rn.VisitCount != 1.0 {
-		t.Errorf("Root node at 1 iteration should have VisitCount of 1.0")
+func TestGame123ToTen_Terminal(t *testing.T) {
+	// Player 0 moved to total 10, now it's player 1's turn at a terminal state.
+	g := &Game123ToTen{total: 10, player: 1}
+	if !g.IsTerminal() {
+		t.Error("expected terminal at total 10")
 	}
-	if rn.NextMoveToTry != 1 {
-		t.Errorf("Root node at 1 iteration should have NextMoveToTry of 1")
-	}
-	// if len(rn.Children) != 1 {
-	// 	t.Errorf("Root node at 1 iteration should have 1 child")
-	// }
-	if rn.Children[0].State.IsSecondPlayersTurn() != true {
-		t.Errorf("State at child node after 1 iteration should have be second players turn")
+	scores := g.Scores()
+	if scores != [2]float64{1, 0} {
+		t.Errorf("expected player 0 wins [1 0], got %v", scores)
 	}
 }
 
-func TestGame123ToTenGoMCTS_DoManyIterationsEndgame(t *testing.T) {
-	iters := 10000
-	gs := NewGameState123ToTen(int64(time.Now().Nanosecond()))
-	gs.Total = 0
-	rn := NewNode(gs, nil, "")
-	rn.DoNIterations(iters)
-	if rn.State.IsSecondPlayersTurn() != false {
-		t.Errorf("Something is wrong")
-	}
-	if rn.VisitCount != float64(iters) {
-		t.Errorf("Root node at %v iterations should have VisitCount of %v", iters, iters)
-	}
-	if rn.NextMoveToTry != rn.NumberOfChildren {
-		t.Errorf("Root node at %v iterations should have NextMoveToTry of %v, not %v", iters, rn.NumberOfChildren, rn.NextMoveToTry)
+func TestGame123ToTen_TerminalPlayer1Wins(t *testing.T) {
+	// Player 1 moved to total 10, now it's player 0's turn at terminal.
+	g := &Game123ToTen{total: 10, player: 0}
+	scores := g.Scores()
+	if scores != [2]float64{0, 1} {
+		t.Errorf("expected player 1 wins [0 1], got %v", scores)
 	}
 }
 
-/////////////////////////////////////////////////////////////
-// AddTillX Game tests
-/////////////////////////////////////////////////////////////
+// --- GameAddTillX unit tests ---
 
-func TestGameAddTillXMCTS_DoManyIterationsEndgame(t *testing.T) {
-	iters := 10000
-	gs := NewGameStateAddTillX(int64(time.Now().Nanosecond()))
-	gs.Total = 0
-	rn := NewNode(gs, nil, "")
-	rn.DoNIterations(iters)
-	if rn.State.IsSecondPlayersTurn() != false {
-		t.Errorf("Something is wrong")
+func TestGameAddTillX_Actions(t *testing.T) {
+	g := NewGameAddTillX(31, 1, 4)
+	if got := len(g.Actions()); got != 4 {
+		t.Errorf("expected 4 actions at start, got %d", got)
 	}
-	if rn.VisitCount != float64(iters) {
-		t.Errorf("Root node at %v iterations should have VisitCount of %v", iters, iters)
+}
+
+func TestGameAddTillX_ActionsNearEnd(t *testing.T) {
+	g := &GameAddTillX{total: 29, target: 31, minAdd: 1, maxAdd: 4}
+	if got := len(g.Actions()); got != 2 {
+		t.Errorf("expected 2 actions at total 29, got %d", got)
 	}
-	if rn.NextMoveToTry != rn.NumberOfChildren {
-		t.Errorf("Root node at %v iterations should have NextMoveToTry of %v, not %v", iters, rn.NumberOfChildren, rn.NextMoveToTry)
+}
+
+func TestGameAddTillX_NextState(t *testing.T) {
+	g := NewGameAddTillX(31, 1, 4)
+	next := g.NextState("3").(*GameAddTillX)
+	if next.Total() != 3 {
+		t.Errorf("expected total 3, got %d", next.Total())
+	}
+	if next.Player() != 1 {
+		t.Errorf("expected player 1, got %d", next.Player())
+	}
+	if g.Total() != 0 {
+		t.Errorf("original mutated")
+	}
+}
+
+// --- MCTS core tests ---
+
+func TestMCTS_SingleIteration(t *testing.T) {
+	g := NewGame123ToTen()
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	m.Search(1)
+	if m.root.visits != 1 {
+		t.Errorf("expected 1 root visit, got %.0f", m.root.visits)
+	}
+	if len(m.root.children) != 1 {
+		t.Errorf("expected 1 child after 1 iteration, got %d", len(m.root.children))
+	}
+}
+
+func TestMCTS_FullExpansion(t *testing.T) {
+	g := NewGame123ToTen()
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	m.Search(100)
+	if len(m.root.children) != 3 {
+		t.Errorf("expected all 3 children expanded after 100 iterations, got %d", len(m.root.children))
+	}
+}
+
+func TestMCTS_Backpropagation(t *testing.T) {
+	g := NewGame123ToTen()
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	m.Search(50)
+	if m.root.visits != 50 {
+		t.Errorf("expected 50 root visits, got %.0f", m.root.visits)
+	}
+	var childVisits float64
+	for _, c := range m.root.children {
+		childVisits += c.visits
+	}
+	if childVisits != 50 {
+		t.Errorf("child visits sum %.0f != root visits 50", childVisits)
+	}
+}
+
+func TestMCTS_CumulativeSearch(t *testing.T) {
+	g := NewGame123ToTen()
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	m.Search(100)
+	m.Search(100)
+	if m.root.visits != 200 {
+		t.Errorf("expected 200 cumulative visits, got %.0f", m.root.visits)
+	}
+}
+
+func TestMCTS_Stats(t *testing.T) {
+	g := NewGame123ToTen()
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	m.Search(100)
+	stats := m.Stats()
+	if stats == "" {
+		t.Error("expected non-empty stats")
+	}
+}
+
+func TestMCTS_BestActionEmpty(t *testing.T) {
+	// Terminal state has no actions.
+	g := &Game123ToTen{total: 10, player: 1}
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	if got := m.BestAction(10); got != "" {
+		t.Errorf("expected empty action for terminal state, got %q", got)
+	}
+}
+
+// --- MCTS optimality tests ---
+
+func TestMCTS_123ToTen_FindsOptimalOpening(t *testing.T) {
+	// From total 0, player 0 should play "2" to reach total 2
+	// (a losing position for the opponent).
+	g := NewGame123ToTen()
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	action := m.BestAction(50000)
+	if action != "2" {
+		t.Errorf("expected optimal opening move '2', got '%s'\n%s", action, m.Stats())
+	}
+}
+
+func TestMCTS_123ToTen_FindsWinningMoveAt7(t *testing.T) {
+	// From total 7, current player can win immediately with "3" → 10.
+	g := &Game123ToTen{total: 7}
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	action := m.BestAction(10000)
+	if action != "3" {
+		t.Errorf("from total 7, expected '3', got '%s'", action)
+	}
+}
+
+func TestMCTS_123ToTen_FindsWinningMoveAt8(t *testing.T) {
+	g := &Game123ToTen{total: 8}
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	action := m.BestAction(10000)
+	if action != "2" {
+		t.Errorf("from total 8, expected '2', got '%s'", action)
+	}
+}
+
+func TestMCTS_123ToTen_FindsWinningMoveAt9(t *testing.T) {
+	g := &Game123ToTen{total: 9}
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	action := m.BestAction(5000)
+	if action != "1" {
+		t.Errorf("from total 9, expected '1', got '%s'", action)
+	}
+}
+
+func TestMCTS_AddTillX_Completion(t *testing.T) {
+	g := NewGameAddTillX(31, 1, 4)
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	m.Search(10000)
+	if m.root.visits != 10000 {
+		t.Errorf("expected 10000 visits, got %.0f", m.root.visits)
+	}
+}
+
+func TestMCTS_AddTillX_FindsWinningMoveAt27(t *testing.T) {
+	// From total 27 (target 31), current player wins with "4" → 31.
+	g := &GameAddTillX{total: 27, target: 31, minAdd: 1, maxAdd: 4}
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	action := m.BestAction(5000)
+	if action != "4" {
+		t.Errorf("from total 27, expected '4', got '%s'", action)
+	}
+}
+
+func TestMCTS_AddTillX_FindsWinningMoveAt22(t *testing.T) {
+	// From total 22 (target 31, min 1, max 4), current player should
+	// play "4" to reach 26 (a losing position for the opponent).
+	// Losing positions are where (target - total) % (min + max) == 0,
+	// i.e., totals 1, 6, 11, 16, 21, 26, 31. The opponent at 26
+	// can only reach 27-30, and from any of those the current player
+	// reaches 31 and wins.
+	g := &GameAddTillX{total: 22, target: 31, minAdd: 1, maxAdd: 4}
+	m := New(g, WithRand(rand.New(rand.NewPCG(42, 0))))
+	action := m.BestAction(20000)
+	if action != "4" {
+		t.Errorf("from total 22, expected '4' (→26), got '%s'\n%s", action, m.Stats())
+	}
+}
+
+// --- Interface satisfaction ---
+
+func TestGame123ToTen_ImplementsGameState(t *testing.T) {
+	var _ GameState = (*Game123ToTen)(nil)
+}
+
+func TestGameAddTillX_ImplementsGameState(t *testing.T) {
+	var _ GameState = (*GameAddTillX)(nil)
+}
+
+// --- WithExplorationFactor option ---
+
+func TestMCTS_WithExplorationFactor(t *testing.T) {
+	g := NewGame123ToTen()
+	m := New(g, WithExplorationFactor(2.0), WithRand(rand.New(rand.NewPCG(42, 0))))
+	if m.explorationFactor != 2.0 {
+		t.Errorf("expected exploration factor 2.0, got %f", m.explorationFactor)
+	}
+	// Should still produce a valid result.
+	action := m.BestAction(1000)
+	if action == "" {
+		t.Error("expected a non-empty action")
 	}
 }

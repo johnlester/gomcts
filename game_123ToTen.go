@@ -1,127 +1,70 @@
 package gomcts
 
 import (
-	"math/rand"
-	"strconv"
 	"fmt"
+	"strconv"
 )
 
-/////////////////////////////////////////////////////////////
-// GameState implementation of my made-up game 123ToTen
-/////////////////////////////////////////////////////////////
-
-type GameState123ToTen struct {
-	Total       int
-	SecondPlayersTurn bool
-	terminal	bool
-	localRand *rand.Rand
+// Game123ToTen implements a simple two-player game where players take turns
+// adding 1, 2, or 3 to a shared total starting at 0. The first player to
+// reach a total of 10 wins.
+//
+// Game theory: a player who brings the total to 2 or 6 can force a win,
+// since they can always respond to keep the total on the 2-6-10 track.
+type Game123ToTen struct {
+	total  int
+	player int // 0 or 1
 }
 
-func NewGameState123ToTen(seed int64) *GameState123ToTen {
-	gs := new(GameState123ToTen)
-	gs.terminal = false
-	gs.SecondPlayersTurn = false
-	rndSrc := rand.NewSource(seed)	// Static seed for testing
-	gs.localRand = rand.New(rndSrc)
-	return gs
+// NewGame123ToTen returns the initial state for a 123ToTen game.
+func NewGame123ToTen() *Game123ToTen {
+	return &Game123ToTen{}
 }
 
-func (gstate *GameState123ToTen) IsSecondPlayersTurn() bool {
-	return gstate.SecondPlayersTurn
-}
-
-
-func (gstate *GameState123ToTen) PossibleMoves() []string {
-	var moves []string
-	switch {
-	case gstate.Total < 8:
-		moves = []string{"1", "2", "3"}
-	case gstate.Total == 8:
-		moves = []string{"1", "2"}
-	case gstate.Total == 9:
-		moves = []string{"1"}
-	default:
-		moves = []string{}
+func (g *Game123ToTen) Actions() []string {
+	remaining := 10 - g.total
+	if remaining <= 0 {
+		return nil
 	}
-	return moves
-}
-
-
-func (gstate *GameState123ToTen) NumberOfMoves() int {
-	return len(gstate.PossibleMoves())
-}
-
-func (gstate *GameState123ToTen) PossibleMovesShuffled() []string {
-	moves := gstate.PossibleMoves()
-	for i, _ := range moves {
-		j := gstate.localRand.Intn(i + 1)
-		moves[i], moves[j] = moves[j], moves[i]
+	maxMove := min(3, remaining)
+	actions := make([]string, maxMove)
+	for i := range maxMove {
+		actions[i] = strconv.Itoa(i + 1)
 	}
-	return moves
+	return actions
 }
 
-
-func (gstate *GameState123ToTen) IsTerminal() bool {
-	return gstate.terminal
-}
-
-func (gstate *GameState123ToTen) LocalRand() *rand.Rand {
-	return gstate.localRand
-}
-
-func (gstate *GameState123ToTen) TerminalReward() [2]float64 {
-	if !gstate.IsTerminal() {
-		panic("reward called but gstate not terminal")
+func (g *Game123ToTen) NextState(action string) GameState {
+	n, _ := strconv.Atoi(action)
+	return &Game123ToTen{
+		total:  g.total + n,
+		player: 1 - g.player,
 	}
-	var reward [2]float64
-	if gstate.SecondPlayersTurn {
-		// Finished game state is second player's turn, which means first player just did winning move
-		reward[0] = 1.0
-		reward[1] = 0.0
-	} else {
-		reward[0] = 0.0
-		reward[1] = 1.0
-	}
-	return reward
 }
 
-func (gstate GameState123ToTen) NewGameStateFromMove(move string) GameState {
-	cpy := gstate.Copy()
-	cpy.DoMove(move)
-	return &cpy
+func (g *Game123ToTen) IsTerminal() bool {
+	return g.total >= 10
 }
 
-func (gstate *GameState123ToTen) RewardFromRandomPlayout() [2]float64 {
-	cpy := gstate.Copy()
-	DoRandomPlayout(&cpy)
-	return cpy.TerminalReward()
+func (g *Game123ToTen) Scores() [2]float64 {
+	// The player whose turn it is did NOT make the winning move;
+	// the other player did.
+	winner := 1 - g.player
+	var scores [2]float64
+	scores[winner] = 1
+	return scores
 }
 
-func (gstate *GameState123ToTen) DoMove(move string) {
-	moveFromString, _ := strconv.Atoi(move)
-	gstate.Total += moveFromString
-	if gstate.Total >= 10 {
-		gstate.terminal = true
-	} 
-	gstate.SecondPlayersTurn = !(gstate.SecondPlayersTurn)
+func (g *Game123ToTen) Player() int {
+	return g.player
 }
 
-func (gstate GameState123ToTen) Copy() GameState123ToTen {
-	newCopy := gstate
-	return newCopy
+// Total returns the current game total.
+func (g *Game123ToTen) Total() int {
+	return g.total
 }
 
-func (gstate *GameState123ToTen) Summary() string {
-	result := fmt.Sprintf("Player %v, Total: %v", gstate.CurrentPlayer(), gstate.Total)
-	return result
-}
-
-func (gstate *GameState123ToTen) CurrentPlayer() string {
-	var result string
-	if gstate.SecondPlayersTurn {
-		result = "B"
-	} else {
-		result = "A"
-	}
-	return result
+// String returns a human-readable description of the game state.
+func (g *Game123ToTen) String() string {
+	return fmt.Sprintf("Player %d to move, total: %d", g.player, g.total)
 }

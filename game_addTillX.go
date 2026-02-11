@@ -1,130 +1,78 @@
 package gomcts
 
 import (
-	"math/rand"
-	"strconv"
 	"fmt"
+	"strconv"
 )
 
-/////////////////////////////////////////////////////////////
-// GameState implementation of my add till X game
-/////////////////////////////////////////////////////////////
-
-const (
-	TargetTotal = 31
-	MinMove = 1
-	MaxMove = 4
-)
-
+// GameAddTillX implements a Nim-like two-player game where players take
+// turns adding between MinAdd and MaxAdd to a shared total. The first
+// player to reach the target total wins.
+//
+// Game theory: with target T, min M, and max X, positions where
+// total % (M + X) == 0 are losing for the player to move.
 type GameAddTillX struct {
-	Total       int
-	SecondPlayersTurn bool
-	terminal	bool
-	localRand *rand.Rand
+	total  int
+	player int // 0 or 1
+	target int
+	minAdd int
+	maxAdd int
 }
 
-func NewGameStateAddTillX(seed int64) *GameAddTillX {
-	gs := new(GameAddTillX)
-	gs.terminal = false
-	gs.SecondPlayersTurn = false
-	rndSrc := rand.NewSource(seed)	// Static seed for testing
-	gs.localRand = rand.New(rndSrc)
-	return gs
-}
-
-func (gstate *GameAddTillX) IsSecondPlayersTurn() bool {
-	return gstate.SecondPlayersTurn
-}
-
-
-func (gstate *GameAddTillX) PossibleMoves() []string {
-	maxCurrentMove := TargetTotal - gstate.Total
-	if maxCurrentMove > MaxMove {
-		maxCurrentMove = MaxMove
+// NewGameAddTillX returns the initial state with the given parameters.
+func NewGameAddTillX(target, minAdd, maxAdd int) *GameAddTillX {
+	return &GameAddTillX{
+		target: target,
+		minAdd: minAdd,
+		maxAdd: maxAdd,
 	}
-	moves := make([]string, maxCurrentMove - MinMove + 1)
-	for i := MinMove; i <= maxCurrentMove; i++ {
-		moves[i-MinMove] = strconv.Itoa(i)
-	} 
-	return moves
 }
 
-
-func (gstate *GameAddTillX) NumberOfMoves() int {
-	return len(gstate.PossibleMoves())
-}
-
-func (gstate *GameAddTillX) PossibleMovesShuffled() []string {
-	moves := gstate.PossibleMoves()
-	for i, _ := range moves {
-		j := gstate.localRand.Intn(i + 1)
-		moves[i], moves[j] = moves[j], moves[i]
+func (g *GameAddTillX) Actions() []string {
+	remaining := g.target - g.total
+	if remaining <= 0 {
+		return nil
 	}
-	return moves
-}
-
-
-func (gstate *GameAddTillX) IsTerminal() bool {
-	return gstate.terminal
-}
-
-func (gstate *GameAddTillX) LocalRand() *rand.Rand {
-	return gstate.localRand
-}
-
-func (gstate *GameAddTillX) TerminalReward() [2]float64 {
-	if !gstate.IsTerminal() {
-		panic("reward called but gstate not terminal")
+	maxMove := min(g.maxAdd, remaining)
+	actions := make([]string, 0, maxMove-g.minAdd+1)
+	for i := g.minAdd; i <= maxMove; i++ {
+		actions = append(actions, strconv.Itoa(i))
 	}
-	var reward [2]float64
-	if gstate.SecondPlayersTurn {
-		// Finished game state is second player's turn, which means first player just did winning move
-		reward[0] = 1.0
-		reward[1] = 0.0
-	} else {
-		reward[0] = 0.0
-		reward[1] = 1.0
+	return actions
+}
+
+func (g *GameAddTillX) NextState(action string) GameState {
+	n, _ := strconv.Atoi(action)
+	return &GameAddTillX{
+		total:  g.total + n,
+		player: 1 - g.player,
+		target: g.target,
+		minAdd: g.minAdd,
+		maxAdd: g.maxAdd,
 	}
-	return reward
 }
 
-func (gstate GameAddTillX) NewGameStateFromMove(move string) GameState {
-	cpy := gstate.Copy()
-	cpy.DoMove(move)
-	return &cpy
+func (g *GameAddTillX) IsTerminal() bool {
+	return g.total >= g.target
 }
 
-func (gstate *GameAddTillX) RewardFromRandomPlayout() [2]float64 {
-	cpy := gstate.Copy()
-	DoRandomPlayout(&cpy)
-	return cpy.TerminalReward()
+func (g *GameAddTillX) Scores() [2]float64 {
+	winner := 1 - g.player
+	var scores [2]float64
+	scores[winner] = 1
+	return scores
 }
 
-func (gstate *GameAddTillX) DoMove(move string) {
-	moveFromString, _ := strconv.Atoi(move)
-	gstate.Total += moveFromString
-	if gstate.Total >= TargetTotal {
-		gstate.terminal = true
-	} 
-	gstate.SecondPlayersTurn = !(gstate.SecondPlayersTurn)
+func (g *GameAddTillX) Player() int {
+	return g.player
 }
 
-func (gstate GameAddTillX) Copy() GameAddTillX {
-	newCopy := gstate
-	return newCopy
+// Total returns the current game total.
+func (g *GameAddTillX) Total() int {
+	return g.total
 }
 
-func (gstate *GameAddTillX) Summary() string {
-	result := fmt.Sprintf("Player %v, Total: %v", gstate.CurrentPlayer(), gstate.Total)
-	return result
-}
-
-func (gstate *GameAddTillX) CurrentPlayer() string {
-	var result string
-	if gstate.SecondPlayersTurn {
-		result = "B"
-	} else {
-		result = "A"
-	}
-	return result
+// String returns a human-readable description of the game state.
+func (g *GameAddTillX) String() string {
+	return fmt.Sprintf("Player %d to move, total: %d (target: %d)", g.player, g.total, g.target)
 }
